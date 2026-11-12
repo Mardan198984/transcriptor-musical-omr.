@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172554"><title>Transcriptor Musical</title>
+<style>
+:root{--navy:#172554;--blue:#2563eb;--pale:#eff6ff;--ink:#172033;--muted:#64748b;--line:#dbe3ef}*{box-sizing:border-box}body{margin:0;background:#f3f6fb;color:var(--ink);font:16px system-ui,sans-serif}header{background:linear-gradient(135deg,#172554,#1d4ed8);color:#fff;padding:24px 18px}.wrap{max-width:850px;margin:auto;padding:0 16px}h1{font-size:26px;margin:0}header p{color:#dbeafe;margin:6px 0 0}main{padding:18px 0 40px}.card{background:#fff;border:1px solid var(--line);border-radius:17px;padding:18px;margin-bottom:15px;box-shadow:0 5px 18px #1725540a}h2{font-size:18px;margin:0 0 12px}label{display:block;font-size:14px;font-weight:700;margin:12px 0 6px}input,select,button{font:inherit}input,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:10px;background:#fff}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.drop{border:2px dashed #93a9ca;border-radius:13px;padding:18px;text-align:center;background:#f8fbff}.hint{font-size:13px;color:var(--muted);line-height:1.5}.primary, .secondary{border:0;border-radius:11px;padding:13px 16px;font-weight:750;cursor:pointer}.primary{background:var(--blue);color:#fff;width:100%;margin-top:14px}.secondary{background:var(--pale);color:#1d4ed8}.primary:disabled{opacity:.5;cursor:wait}.status{padding:12px;border-radius:10px;background:#f1f5f9;margin-top:12px;font-size:14px;white-space:pre-wrap}.good{background:#ecfdf5;color:#166534}.bad{background:#fef2f2;color:#991b1b}.hidden{display:none}a{color:#1d4ed8;font-weight:700}footer{text-align:center;color:var(--muted);font-size:12px;padding:12px}@media(max-width:560px){.row{grid-template-columns:1fr}h1{font-size:23px}}
+</style></head><body>
+<header><div class="wrap"><h1>🎼 Transcriptor Musical</h1><p>Reconocimiento de partituras y transposición instrumental</p></div></header>
+<main class="wrap">
+<section class="card"><h2>1. Carga tu partitura</h2><div class="drop">📄<br><b>Fotografía o PDF</b><p class="hint">Formatos admitidos: JPG, PNG y PDF. Usa una imagen nítida, recta y con buena luz.</p><input id="score" type="file" accept="image/jpeg,image/png,application/pdf"></div><p id="filename" class="hint">Ningún archivo seleccionado.</p></section>
+<section class="card"><h2>2. Selecciona los instrumentos</h2><div class="row"><div><label for="source">Instrumento original</label><select id="source"></select></div><div><label for="target">Instrumento de destino</label><select id="target"></select></div></div><p class="hint">La conversión busca conservar el sonido real, ajustando las notas escritas y la tonalidad entre instrumentos.</p></section>
+<section class="card"><h2>3. Reconocer y transponer</h2><p class="hint">El servidor usa Audiveris para reconocer la notación (OMR) y Music21 para transportar las notas. El servidor debe estar instalado y ejecutándose para procesar archivos.</p><button class="primary" id="run">Reconocer partitura y convertir</button><div id="status" class="status" role="status">Listo para recibir una partitura.</div><div id="download" class="hidden" style="margin-top:14px"><p><b>Partitura convertida:</b></p><a id="xmlLink" download="partitura_convertida.musicxml">Descargar MusicXML</a><p class="hint">Abre el MusicXML con MuseScore u otro editor de partituras para revisar, imprimir o exportar a PDF.</p></div></section>
+<section class="card"><h2>Instrumentos incluidos</h2><p><b>Do:</b> Oboe, flauta, trombón y piano.</p><p><b>Si♭:</b> Trompeta, clarinete, saxofón soprano y saxofón tenor.</p><p><b>Mi♭:</b> Saxofón alto.</p><p class="hint">Importante: el reconocimiento óptico puede equivocarse con partituras borrosas, manuscritas o muy complejas. Revisa siempre la partitura resultante antes de usarla.</p></section>
+</main><footer>Transcriptor Musical · Versión 2 · Requiere servidor OMR para reconocimiento</footer>
+<script>
+const instruments=[
+{id:"oboe",name:"Oboe en Do",semi:0},{id:"flute",name:"Flauta en Do",semi:0},{id:"trombone",name:"Trombón en Do",semi:0},{id:"piano",name:"Piano en Do",semi:0},
+{id:"trumpet",name:"Trompeta en Si bemol",semi:-2},{id:"clarinet",name:"Clarinete en Si bemol",semi:-2},{id:"soprano",name:"Saxofón soprano en Si bemol",semi:-2},{id:"tenor",name:"Saxofón tenor en Si bemol",semi:-14},{id:"alto",name:"Saxofón alto en Mi bemol",semi:-9}];
+for(const el of [source,target]) instruments.forEach(i=>el.add(new Option(i.name,i.id)));
+source.value="trumpet";target.value="oboe";
+const file=document.querySelector("#score"),status=document.querySelector("#status"),run=document.querySelector("#run");
+file.onchange=()=>document.querySelector("#filename").textContent=file.files[0]?.name||"Ningún archivo seleccionado.";
+run.onclick=async()=>{
+ if(!file.files.length){status.textContent="Primero selecciona una fotografía o un PDF.";status.className="status bad";return}
+ run.disabled=true;status.className="status";status.textContent="Procesando… el reconocimiento puede tardar según el número de páginas.";
+ document.querySelector("#download").classList.add("hidden");
+ const data=new FormData();data.append("file",file.files[0]);data.append("source",source.value);data.append("target",target.value);
+ try{
+  const response=await fetch("/api/transpose",{method:"POST",body:data});
+  if(!response.ok){let msg="No se pudo procesar el archivo.";try{msg=(await response.json()).detail||msg}catch{}throw new Error(msg)}
+  const blob=await response.blob(),url=URL.createObjectURL(blob);
+  const link=document.querySelector("#xmlLink");link.href=url;link.download="partitura_"+target.value+".musicxml";
+  document.querySelector("#download").classList.remove("hidden");
+  status.textContent="¡Conversión terminada! Descarga el MusicXML y revisa la partitura antes de imprimir.";status.className="status good";
+ }catch(e){status.textContent=e.message+"\\nComprueba que el servidor esté instalado y accesible.";status.className="status bad"}
+ finally{run.disabled=false}
+};
+</script></body></html>
